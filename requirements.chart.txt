@@ -1,0 +1,5 @@
+kafka-python-ng>=2.2.2
+flask>=3.0.0
+plotly>=5.24.0
+plotext>=5.2.8
+python-dotenv>=1.0.1

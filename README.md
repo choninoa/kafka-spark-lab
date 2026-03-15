@@ -42,14 +42,17 @@ Se obtienen datos meteorológicos reales desde [WeatherAPI](https://www.weathera
 kafka-spark-lab/
 ├── docker-compose.yml          # Define todos los servicios Docker
 ├── Dockerfile.producer         # Imagen Alpine para el producer (Python ligero)
+├── Dockerfile.chart            # Imagen Alpine para chart-consumer
 ├── requirements.producer.txt   # Dependencias del producer (sin PySpark)
+├── requirements.chart.txt      # Dependencias del chart-consumer
 ├── requirements.txt            # Dependencias completas (para desarrollo local)
 ├── .env.example                # Plantilla de variables de entorno
 ├── GUIA-LAB.md                 # Guía paso a paso del laboratorio
 ├── README.md                   # Este archivo
 └── scripts/
     ├── producer.py             # Productor: envía datos del clima a Kafka
-    └── spark_consumer.py       # Consumer: Spark Structured Streaming
+    ├── spark_consumer.py       # Consumer: Spark Structured Streaming
+    └── chart_consumer.py       # Consumer: dashboard web Plotly.js + charts en terminal
 ```
 
 > Los scripts se montan como bind volume en todos los contenedores Spark y producer. Edita un `.py` y el cambio está disponible al instante sin rebuild.
@@ -67,6 +70,7 @@ kafka-spark-lab/
 | **spark-master** | `apache/spark:3.5.3-python3` | `8080`, `7077`, `4040` | Nodo maestro Spark (Web UI) |
 | **spark-worker** | `apache/spark:3.5.3-python3` | — | Worker Spark (2 cores, 2 GB RAM) |
 | **kafka-ui** | `provectuslabs/kafka-ui` | `8090` | Interfaz web para inspeccionar Kafka |
+| **chart-consumer** | `Dockerfile.chart` (Alpine) | `8050` | Dashboard web Plotly.js + bar charts en terminal (plotext) |
 
 ---
 
@@ -163,6 +167,7 @@ Verás los datos de distintas ciudades llegando en formato tabla:
 | Kafka UI | [http://localhost:8090](http://localhost:8090) | Topics, mensajes, particiones |
 | Spark Master UI | [http://localhost:8080](http://localhost:8080) | Estado del clúster Spark |
 | Spark Application UI | [http://localhost:4040](http://localhost:4040) | Job en ejecución (disponible mientras corre el consumer) |
+| Chart Dashboard | [http://localhost:8050](http://localhost:8050) | Temperatura y humedad por ciudad, se actualiza cada 5s |
 
 ---
 

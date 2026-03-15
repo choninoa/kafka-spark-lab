@@ -135,6 +135,43 @@ services:
       - lab-network
 
   # ============================================
+  # CHART CONSUMER - Dashboard web + terminal
+  # Web:      http://localhost:8050
+  # Terminal: docker logs -f chart-consumer
+  # ============================================
+  chart-consumer:
+    build:
+      context: .
+      dockerfile: Dockerfile.chart
+    container_name: chart-consumer
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      KAFKA_BOOTSTRAP: kafka:9093
+      PYTHONUNBUFFERED: "1"
+      REFRESH_WEB: "5"
+      REFRESH_TERM: "10"
+    ports:
+      - "8050:8050"
+    volumes:
+      - ./scripts:/opt/spark-scripts
+    depends_on:
+      kafka:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - lab-network
+
+  # ============================================
   # SPARK MASTER 3.5.3
   # Consumer: docker exec spark-master /opt/spark/bin/spark-submit
   #   --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0

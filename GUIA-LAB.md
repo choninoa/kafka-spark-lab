@@ -35,6 +35,7 @@ kafka-spark-lab/
 | spark-master | apache/spark:3.5.3-python3 | 8080, 7077, 4040 | Spark Master (Web UI) |
 | spark-worker | apache/spark:3.5.3-python3 | - | Spark Worker (2 cores, 2GB) |
 | kafka-ui | provectuslabs/kafka-ui | 8090 | UI para ver topics y mensajes |
+| chart-consumer | Dockerfile.chart (Alpine) | 8050 | Dashboard Plotly.js + charts en terminal |
 
 ---
 
@@ -75,6 +76,10 @@ docker compose logs -f producer
 # Spark Consumer procesando el stream
 # (la primera vez tarda ~1 min descargando el paquete Kafka)
 docker compose logs -f spark-consumer
+
+# Chart Consumer (web + terminal simultaneo)
+docker logs -f chart-consumer        # Bar charts en terminal con plotext (se actualiza cada 10s)
+# Abrir en browser: http://localhost:8050  (graficos Plotly, se refresca cada 5s)
 ```
 
 ## Paso 5: Verificar en Kafka UI
