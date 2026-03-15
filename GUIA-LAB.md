@@ -31,12 +31,12 @@ kafka-spark-lab/
 
 | Servicio | Imagen | Puerto | Descripcion |
 |---|---|---|---|
-| kafka | apache/kafka:3.7.0 | 9092/9093 | Broker Kafka (KRaft, sin Zookeeper) |
+| kafka | apache/kafka:3.7.0 | 9092 (host) | Broker Kafka (KRaft, sin Zookeeper); 9093 es interno |
 | kafka-init | apache/kafka:3.7.0 | - | Crea el topic weather-data y termina |
 | producer | Dockerfile.producer (Alpine) | - | Envia datos del clima a Kafka |
-| spark-consumer | apache/spark:3.5.3-python3 | - | Lee el stream con Spark Structured Streaming |
-| spark-master | apache/spark:3.5.3-python3 | 8080, 7077, 4040 | Spark Master (Web UI) |
-| spark-worker | apache/spark:3.5.3-python3 | - | Spark Worker (2 cores, 2GB) |
+| spark-consumer | apache/spark:3.5.3-python3 | 4040 | Lee el stream con Spark Structured Streaming; Application UI en :4040 |
+| spark-master | apache/spark:3.5.3-python3 | 8080, 7077 | Spark Master Web UI y puerto de cluster |
+| spark-worker | apache/spark:3.5.3-python3 | 8081 | Spark Worker Web UI (cores, tareas) |
 | kafka-ui | provectuslabs/kafka-ui | 8090 | UI para ver topics y mensajes |
 | chart-consumer | Dockerfile.chart (Alpine) | 8050 | Dashboard Plotly.js + charts en terminal |
 
@@ -89,10 +89,15 @@ docker logs -f chart-consumer        # Bar charts en terminal con plotext (se ac
 
 Abre http://localhost:8090 → Topics → weather-data → Messages
 
-## Paso 6: Ver Spark UI
+## Paso 6: Abrir interfaces web
 
-- Spark Master UI: http://localhost:8080
-- Spark Application UI: http://localhost:4040 (disponible mientras corre el consumer)
+| URL | Que muestra |
+|-----|-------------|
+| http://localhost:8050 | Chart Dashboard — temperatura y humedad en tiempo real (refresca cada 1s) |
+| http://localhost:8080 | Spark Master UI — estado del cluster y workers conectados |
+| http://localhost:8081 | Spark Worker UI — cores, RAM y tareas en ejecucion |
+| http://localhost:4040 | Spark Application UI — jobs, stages y streaming query (solo mientras corre spark-consumer) |
+| http://localhost:8090 | Kafka UI — topics, mensajes, particiones y offsets |
 
 ---
 
