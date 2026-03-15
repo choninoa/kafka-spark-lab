@@ -18,7 +18,7 @@ kafka-spark-lab/
 ├── requirements.producer.txt    # Deps del producer (sin PySpark)
 ├── .env.example                 # Plantilla de variables
 └── scripts/
-    ├── producer.py              # Envia datos del clima a Kafka
+    ├── producer.py              # Envia datos del clima de 15 ciudades aleatorias a Kafka
     └── spark_consumer.py        # Lee stream de Kafka con Spark
 ```
 
@@ -48,6 +48,7 @@ kafka-spark-lab/
 ```bash
 cp .env.example .env
 # Edita .env y pon tu WEATHER_API_KEY real
+# La variable CITY ya no se usa — el producer rota entre 15 ciudades automaticamente
 ```
 
 ## Paso 3: Levantar todos los servicios
@@ -66,8 +67,10 @@ docker compose logs kafka-init
 ## Paso 4: Ver los datos en tiempo real
 
 ```bash
-# Producer enviando datos
+# Producer rotando entre 15 ciudades del mundo
 docker compose logs -f producer
+# [2026-03-15 17:26] Tokyo, Japan | 10.4°C | 76% | 16.2 kph | Light rain
+# [2026-03-15 17:27] Madrid, Spain | 15.1°C | 41% | 15.5 kph | Sunny
 
 # Spark Consumer procesando el stream
 # (la primera vez tarda ~1 min descargando el paquete Kafka)

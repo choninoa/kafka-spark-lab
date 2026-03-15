@@ -21,7 +21,7 @@ Se obtienen datos meteorológicos reales desde [WeatherAPI](https://www.weathera
 ```
 
 **Flujo de datos:**
-1. `producer` consulta el clima desde WeatherAPI cada N segundos y envía JSON a Kafka
+1. `producer` elige aleatoriamente una ciudad de una lista de 15 ciudades del mundo, consulta el clima desde WeatherAPI cada N segundos y envía JSON a Kafka
 2. `spark-consumer` lee el stream de Kafka con Spark Structured Streaming y muestra los datos en consola
 3. Todos los servicios comparten la misma red Docker (`lab-network`)
 
@@ -90,11 +90,10 @@ cd kafka-spark-lab
 cp .env.example .env
 ```
 
-Edita `.env` con tu API Key y ciudad:
+Edita `.env` y pon tu API Key:
 
 ```env
 WEATHER_API_KEY=abc123tuapikeyreal
-CITY=Trujillo
 KAFKA_BOOTSTRAP=localhost:9092
 KAFKA_TOPIC=weather-data
 INTERVAL_SECONDS=10
@@ -103,8 +102,9 @@ INTERVAL_SECONDS=10
 | Variable | Descripción | Valor por defecto |
 |---|---|---|
 | `WEATHER_API_KEY` | API Key de WeatherAPI.com **(obligatoria)** | `TU_API_KEY_AQUI` |
-| `CITY` | Ciudad de la que se obtiene el clima | `Trujillo` |
-| `INTERVAL_SECONDS` | Segundos entre cada consulta | `10` |
+| `INTERVAL_SECONDS` | Segundos entre cada consulta a una ciudad | `10` |
+
+> Las ciudades están definidas directamente en `scripts/producer.py` (15 ciudades del mundo). No se usa la variable `CITY`.
 
 ### 4. Build y levantar todos los servicios
 
@@ -124,10 +124,18 @@ Deberías ver: `>>> Topic weather-data creado exitosamente!`
 
 ### 5. Ver los datos en tiempo real
 
-**Producer** (enviando datos a Kafka):
+**Producer** (rotando entre ciudades del mundo):
 
 ```bash
 docker compose logs -f producer
+```
+
+Verás algo como:
+```
+Ciudades: Trujillo, Lima, Cusco, Arequipa, Madrid, Barcelona, Buenos Aires, ...
+[2026-03-15 17:26] Tokyo, Japan | 10.4°C | 76% | 16.2 kph | Light rain
+[2026-03-15 17:27] Madrid, Spain | 15.1°C | 41% | 15.5 kph | Sunny
+[2026-03-15 17:27] Bogota, Colombia | 20.4°C | 46% | 3.6 kph | Patchy rain nearby
 ```
 
 **Spark Consumer** (procesando el stream — tarda ~1 min en descargar el paquete Kafka la primera vez):
@@ -136,14 +144,16 @@ docker compose logs -f producer
 docker compose logs -f spark-consumer
 ```
 
-Verás los datos del clima llegando en formato tabla:
+Verás los datos de distintas ciudades llegando en formato tabla:
 
 ```
-+----------+-----------+-------+-------------+--------+--------+-------------+----------------+
-|city      |region     |country|temperature_c|humidity|wind_kph|condition    |timestamp       |
-+----------+-----------+-------+-------------+--------+--------+-------------+----------------+
-|Trujillo  |La Libertad|Peru   |22.0         |78      |15.1    |Partly cloudy|2026-03-15 10:30|
-+----------+-----------+-------+-------------+--------+--------+-------------+----------------+
++----------+-----------+--------+-------------+--------+--------+------------------+----------------+
+|city      |region     |country |temperature_c|humidity|wind_kph|condition         |timestamp       |
++----------+-----------+--------+-------------+--------+--------+------------------+----------------+
+|Tokyo     |Tokyo      |Japan   |10.4         |76      |16.2    |Light rain        |2026-03-15 17:26|
+|Madrid    |Madrid     |Spain   |15.1         |41      |15.5    |Sunny             |2026-03-15 17:27|
+|Bogota    |Bogota D.C.|Colombia|20.4         |46      |3.6     |Patchy rain nearby|2026-03-15 17:27|
++----------+-----------+--------+-------------+--------+--------+------------------+----------------+
 ```
 
 ### 6. Interfaces web
