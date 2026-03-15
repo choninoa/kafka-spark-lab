@@ -68,8 +68,8 @@ kafka-spark-lab/
 | **kafka** | `apache/kafka:3.7.0` | `9092` (host), `9093` (interno) | Broker Kafka en modo KRaft (sin Zookeeper) |
 | **kafka-init** | `apache/kafka:3.7.0` | — | Crea el topic `weather-data` y termina |
 | **producer** | `Dockerfile.producer` (Alpine) | — | Envía datos del clima a Kafka |
-| **spark-consumer** | `apache/spark:3.5.3-python3` | — | Lee el stream de Kafka con Spark |
-| **spark-master** | `apache/spark:3.5.3-python3` | `8080`, `7077`, `4040` | Nodo maestro Spark (Web UI) |
+| **spark-consumer** | `apache/spark:3.5.3-python3` | `4040` | Lee el stream de Kafka con Spark; Application UI en :4040 |
+| **spark-master** | `apache/spark:3.5.3-python3` | `8080`, `7077` | Nodo maestro Spark (Web UI) |
 | **spark-worker** | `apache/spark:3.5.3-python3` | — | Worker Spark (2 cores, 2 GB RAM) |
 | **kafka-ui** | `provectuslabs/kafka-ui` | `8090` | Interfaz web para inspeccionar Kafka |
 | **chart-consumer** | `Dockerfile.chart` (Alpine) | `8050` | Dashboard web Plotly.js + bar charts en terminal (plotext) |
@@ -168,7 +168,7 @@ Verás los datos de distintas ciudades llegando en formato tabla:
 |---|---|---|
 | Kafka UI | [http://localhost:8090](http://localhost:8090) | Topics, mensajes, particiones |
 | Spark Master UI | [http://localhost:8080](http://localhost:8080) | Estado del clúster Spark |
-| Spark Application UI | [http://localhost:4040](http://localhost:4040) | Job en ejecución (disponible mientras corre el consumer) |
+| Spark Application UI | [http://localhost:4040](http://localhost:4040) | Job de streaming en ejecución (corre en spark-consumer) |
 | Chart Dashboard | [http://localhost:8050](http://localhost:8050) | Temperatura y humedad por ciudad, se actualiza cada 1s |
 
 ---
