@@ -1,33 +1,40 @@
-# Guia del Lab: Procesamiento y Manejo de Datos con Docker
+# Guia del Lab: Procesamiento de Datos en Tiempo Real con Docker
 
 ## Arquitectura
 
 ```
-WeatherAPI.com --> producer.py --> [KAFKA topic: weather-data] --> spark_consumer.py (Spark Streaming)
-                  (tu maquina)     (Docker)                       (Docker o tu maquina)
+WeatherAPI.com --> producer --> [KAFKA topic: weather-data] --> spark-consumer
+  (Internet)      (Docker)          (Docker)                    (Docker - Spark Streaming)
 ```
+
+Todo corre dentro de Docker en la misma red (`lab-network`). No necesitas Java ni PySpark en tu maquina.
 
 ## Estructura de archivos
 
 ```
 kafka-spark-lab/
-├── docker-compose.yml
-├── GUIA-LAB.md
+├── docker-compose.yml           # Todos los servicios
+├── Dockerfile.producer          # Imagen Alpine para el producer
+├── requirements.producer.txt    # Deps del producer (sin PySpark)
+├── .env.example                 # Plantilla de variables
 └── scripts/
-    ├── producer.py                # Lo corres manual en tu PC
-    ├── spark_consumer.py          # Para correr DENTRO del contenedor Spark
-    └── spark_consumer_local.py    # Para correr desde tu PC con pyspark local
+    ├── producer.py              # Envia datos del clima a Kafka
+    └── spark_consumer.py        # Lee stream de Kafka con Spark
 ```
+
+> Los scripts estan montados como bind volume: editas el .py y el cambio esta disponible sin rebuild.
 
 ## Servicios en Docker
 
 | Servicio | Imagen | Puerto | Descripcion |
-|----------|--------|--------|-------------|
-| kafka | apache/kafka:3.7.0 | 9092 | Broker Kafka (KRaft, sin Zookeeper) |
+|---|---|---|---|
+| kafka | apache/kafka:3.7.0 | 9092/9093 | Broker Kafka (KRaft, sin Zookeeper) |
 | kafka-init | apache/kafka:3.7.0 | - | Crea el topic weather-data y termina |
-| spark-master | apache/spark:3.5.3-python3 | 8080, 7077, 4040 | Spark Master |
-| spark-worker | apache/spark:3.5.3-python3 | - | Spark Worker |
-| kafka-ui | provectuslabs/kafka-ui | 8090 | UI para ver topics y mensajes (opcional) |
+| producer | Dockerfile.producer (Alpine) | - | Envia datos del clima a Kafka |
+| spark-consumer | apache/spark:3.5.3-python3 | - | Lee el stream con Spark Structured Streaming |
+| spark-master | apache/spark:3.5.3-python3 | 8080, 7077, 4040 | Spark Master (Web UI) |
+| spark-worker | apache/spark:3.5.3-python3 | - | Spark Worker (2 cores, 2GB) |
+| kafka-ui | provectuslabs/kafka-ui | 8090 | UI para ver topics y mensajes |
 
 ---
 
@@ -35,86 +42,78 @@ kafka-spark-lab/
 
 1. Ve a https://www.weatherapi.com/ y crea una cuenta gratuita
 2. Copia tu API Key del dashboard
-3. Editala en scripts/producer.py en la variable WEATHER_API_KEY
 
-## Paso 2: Levantar los servicios
+## Paso 2: Configurar variables de entorno
 
 ```bash
-cd kafka-spark-lab
-docker compose up -d
+cp .env.example .env
+# Edita .env y pon tu WEATHER_API_KEY real
 ```
 
-Espera unos 30 segundos a que Kafka arranque. Verifica con:
+## Paso 3: Levantar todos los servicios
+
+```bash
+docker compose up -d --build
+```
+
+Espera ~30 segundos a que Kafka arranque. Verifica:
 
 ```bash
 docker compose logs kafka-init
+# Debe mostrar: Topic weather-data creado exitosamente!
 ```
 
-Deberias ver: Topic weather-data creado exitosamente!
-
-## Paso 3: Verificar que Kafka esta corriendo
+## Paso 4: Ver los datos en tiempo real
 
 ```bash
-docker exec kafka /opt/kafka/bin/kafka-topics.sh --list --bootstrap-server localhost:9092
+# Producer enviando datos
+docker compose logs -f producer
+
+# Spark Consumer procesando el stream
+# (la primera vez tarda ~1 min descargando el paquete Kafka)
+docker compose logs -f spark-consumer
 ```
 
-## Paso 4: Instalar dependencias Python en tu maquina
+## Paso 5: Verificar en Kafka UI
 
-```bash
-pip install kafka-python requests pyspark
-```
+Abre http://localhost:8090 → Topics → weather-data → Messages
 
-## Paso 5: Ejecutar el Producer (en tu PC)
-
-```bash
-cd kafka-spark-lab/scripts
-python producer.py
-```
-
-Dejalo corriendo mientras ejecutas el consumer.
-
-## Paso 6: Ejecutar el Spark Consumer
-
-### Opcion A: Desde el contenedor Spark (recomendado)
-
-```bash
-docker exec -it spark-master /opt/spark/bin/spark-submit \
-    --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 \
-    /opt/spark-scripts/spark_consumer.py
-```
-
-### Opcion B: Desde tu PC (requiere pyspark + Java)
-
-```bash
-spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 spark_consumer_local.py
-```
-
-## Paso 7: Verificar mensajes (opcional)
-
-### Con Kafka UI
-Abre http://localhost:8090 -> Topics -> weather-data -> Messages
-
-### Con consumer de consola de Kafka
-```bash
-docker exec -it kafka /opt/kafka/bin/kafka-console-consumer.sh \
-    --topic weather-data \
-    --from-beginning \
-    --bootstrap-server localhost:9092
-```
-
-## Paso 8: Ver Spark UI
+## Paso 6: Ver Spark UI
 
 - Spark Master UI: http://localhost:8080
-- Spark Application UI: http://localhost:4040
+- Spark Application UI: http://localhost:4040 (disponible mientras corre el consumer)
+
+---
+
+## Editar scripts en caliente
+
+```bash
+# Edita el script
+vim scripts/producer.py
+
+# Aplica el cambio sin rebuild
+docker compose restart producer
+```
 
 ---
 
 ## Comandos utiles
 
 ```bash
-docker compose logs -f kafka          # Logs de Kafka
-docker compose logs -f spark-master   # Logs de Spark
-docker compose down                   # Parar todo
-docker compose down -v                # Parar y borrar volumenes
-docker compose down -v && docker compose up -d  # Recrear desde cero
+docker compose ps                         # Estado de todos los contenedores
+docker compose logs -f producer           # Logs del producer
+docker compose logs -f spark-consumer    # Logs del consumer
+docker compose down                       # Parar todo
+docker compose down -v                    # Parar y borrar volumenes
+docker compose down -v && docker compose up -d --build  # Recrear desde cero
+```
+
+### Kafka
+
+```bash
+# Ver mensajes en consola
+docker exec -it kafka /opt/kafka/bin/kafka-console-consumer.sh \
+    --topic weather-data \
+    --from-beginning \
+    --bootstrap-server localhost:9092
 ```
