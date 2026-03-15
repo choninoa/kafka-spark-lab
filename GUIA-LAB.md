@@ -15,11 +15,14 @@ Todo corre dentro de Docker en la misma red (`lab-network`). No necesitas Java n
 kafka-spark-lab/
 ├── docker-compose.yml           # Todos los servicios
 ├── Dockerfile.producer          # Imagen Alpine para el producer
+├── Dockerfile.chart             # Imagen Alpine para el chart-consumer
 ├── requirements.producer.txt    # Deps del producer (sin PySpark)
+├── requirements.chart.txt       # Deps del chart-consumer (Flask, Plotly, plotext)
 ├── .env.example                 # Plantilla de variables
 └── scripts/
     ├── producer.py              # Envia datos del clima de 15 ciudades aleatorias a Kafka
-    └── spark_consumer.py        # Lee stream de Kafka con Spark
+    ├── spark_consumer.py        # Lee stream de Kafka con Spark
+    └── chart_consumer.py        # Dashboard web Plotly.js + bar charts en terminal
 ```
 
 > Los scripts estan montados como bind volume: editas el .py y el cambio esta disponible sin rebuild.
@@ -78,8 +81,8 @@ docker compose logs -f producer
 docker compose logs -f spark-consumer
 
 # Chart Consumer (web + terminal simultaneo)
-docker logs -f chart-consumer        # Bar charts en terminal con plotext (se actualiza cada 10s)
-# Abrir en browser: http://localhost:8050  (graficos Plotly, se refresca cada 5s)
+docker logs -f chart-consumer        # Bar charts en terminal con plotext (se actualiza cada 3s)
+# Abrir en browser: http://localhost:8050  (graficos Plotly, se refresca cada 1s)
 ```
 
 ## Paso 5: Verificar en Kafka UI

@@ -14,9 +14,11 @@ Se obtienen datos meteorológicos reales desde [WeatherAPI](https://www.weathera
    (Internet)       │  (Alpine)     topic:    (Spark Streaming)          │
                     │               weather-data                          │
                     │                    │                                │
-                    │                    ▼                                │
-                    │                 Kafka UI                            │
-                    │              (localhost:8090)                       │
+                    │          ┌─────────┴──────────┐                    │
+                    │          ▼                     ▼                    │
+                    │       Kafka UI           chart-consumer             │
+                    │    (localhost:8090)    web: localhost:8050          │
+                    │                       term: docker logs             │
                     └─────────────────────────────────────────────────────┘
 ```
 
@@ -167,7 +169,7 @@ Verás los datos de distintas ciudades llegando en formato tabla:
 | Kafka UI | [http://localhost:8090](http://localhost:8090) | Topics, mensajes, particiones |
 | Spark Master UI | [http://localhost:8080](http://localhost:8080) | Estado del clúster Spark |
 | Spark Application UI | [http://localhost:4040](http://localhost:4040) | Job en ejecución (disponible mientras corre el consumer) |
-| Chart Dashboard | [http://localhost:8050](http://localhost:8050) | Temperatura y humedad por ciudad, se actualiza cada 5s |
+| Chart Dashboard | [http://localhost:8050](http://localhost:8050) | Temperatura y humedad por ciudad, se actualiza cada 1s |
 
 ---
 
@@ -260,7 +262,10 @@ lsof -i :9092  # o el puerto en conflicto
 |---|---|---|
 | Apache Kafka | 3.7.0 | Broker de mensajería (modo KRaft) |
 | Apache Spark | 3.5.3 | Procesamiento de datos en streaming |
-| Python | 3.12 (Alpine) | Producer de datos |
+| Python | 3.12 (Alpine) | Producer y consumers |
+| Flask | 3.x | Servidor web del dashboard en chart-consumer |
+| Plotly.js | — | Gráficos interactivos en el dashboard web |
+| plotext | 5.x | Bar charts en terminal (docker logs) |
 | Docker | — | Contenedores para todos los servicios |
 | WeatherAPI | — | Fuente de datos meteorológicos en tiempo real |
 
