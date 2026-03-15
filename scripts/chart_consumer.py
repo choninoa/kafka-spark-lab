@@ -2,10 +2,10 @@
 Chart Consumer - Dashboard de clima en tiempo real
 ===================================================
 Dos salidas simultaneas:
-  - Terminal: bar charts con plotext cada 10 segundos
+  - Terminal: bar charts con plotext cada 3 segundos
               (ver con: docker logs -f chart-consumer)
   - Web:      dashboard Plotly.js en http://localhost:8050
-              (auto-refresca cada 5s)
+              (auto-refresca cada 1s, resalta ultimo dato)
 """
 
 import json
@@ -23,11 +23,12 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP", "kafka:9093")
 KAFKA_TOPIC     = os.getenv("KAFKA_TOPIC", "weather-data")
-REFRESH_WEB     = int(os.getenv("REFRESH_WEB", "5"))
-REFRESH_TERM    = int(os.getenv("REFRESH_TERM", "10"))
+REFRESH_WEB     = int(os.getenv("REFRESH_WEB", "1"))
+REFRESH_TERM    = int(os.getenv("REFRESH_TERM", "3"))
 
-# Estado compartido: {ciudad: ultimo_dato}
+# Estado compartido
 latest_by_city: dict = OrderedDict()
+last_received:  dict = {}          # ultimo mensaje recibido completo
 lock = threading.Lock()
 
 
@@ -42,21 +43,34 @@ def print_terminal_chart():
         cities = list(latest_by_city.keys())
         temps  = [latest_by_city[c]["temperature_c"] for c in cities]
         hums   = [latest_by_city[c]["humidity"]      for c in cities]
+        last   = last_received.copy()
 
+    # Banner del ultimo dato recibido
+    if last:
+        print("\n" + "▶" * 65)
+        print(f"  ÚLTIMO DATO:  {last.get('city')}, {last.get('country')}  |  "
+              f"{last.get('temperature_c')}°C  |  {last.get('humidity')}% hum  |  "
+              f"{last.get('condition')}  |  {last.get('timestamp')}")
+        print("▶" * 65)
+
+    # Chart temperatura — resaltar ciudad del ultimo dato
+    last_city = last.get("city") if last else None
     print("\n" + "=" * 65)
-    print("  TEMPERATURA (°C) — ultima lectura por ciudad")
+    print(f"  TEMPERATURA (°C)  {'← ' + last_city if last_city else ''}")
     print("=" * 65)
     plt.clear_figure()
-    plt.bar(cities, temps, marker="sd")
+    colors = ["red+" if c == last_city else "blue+" for c in cities]
+    plt.bar(cities, temps, marker="sd", color=colors)
     plt.plotsize(65, 15)
     plt.theme("dark")
     plt.show()
 
     print("\n" + "=" * 65)
-    print("  HUMEDAD (%) — ultima lectura por ciudad")
+    print(f"  HUMEDAD (%)  {'← ' + last_city if last_city else ''}")
     print("=" * 65)
     plt.clear_figure()
-    plt.bar(cities, hums, marker="sd", color="cyan+")
+    colors = ["yellow+" if c == last_city else "cyan+" for c in cities]
+    plt.bar(cities, hums, marker="sd", color=colors)
     plt.plotsize(65, 15)
     plt.theme("dark")
     plt.show()
@@ -78,8 +92,6 @@ def kafka_consumer_thread():
     while True:
         try:
             print(f"[chart-consumer] Conectando a Kafka {KAFKA_BOOTSTRAP} topic={KAFKA_TOPIC}")
-            # group_id unico por arranque: sin offsets comprometidos previos
-            # auto_offset_reset='earliest': carga historico al arrancar
             consumer = KafkaConsumer(
                 KAFKA_TOPIC,
                 bootstrap_servers=[KAFKA_BOOTSTRAP],
@@ -94,7 +106,9 @@ def kafka_consumer_thread():
                 city = data.get("city", "Unknown")
                 with lock:
                     latest_by_city[city] = data
-                print(f"[{data.get('timestamp')}] {city}, {data.get('country')} | "
+                    last_received.clear()
+                    last_received.update(data)
+                print(f"[{data.get('timestamp')}] ▶ {city}, {data.get('country')} | "
                       f"{data.get('temperature_c')}°C | "
                       f"{data.get('humidity')}% hum | "
                       f"{data.get('condition')}")
@@ -123,12 +137,36 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       padding: 24px;
     }
     h1 { color: #58a6ff; font-size: 1.6rem; margin-bottom: 4px; }
-    .subtitle { color: #8b949e; font-size: 0.85rem; margin-bottom: 24px; }
+    .subtitle { color: #8b949e; font-size: 0.85rem; margin-bottom: 12px; }
+    #last-banner {
+      background: #1c2128;
+      border: 1px solid #ffd700;
+      border-radius: 6px;
+      padding: 10px 16px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.9rem;
+    }
+    #last-banner .dot {
+      width: 10px; height: 10px;
+      background: #ffd700;
+      border-radius: 50%;
+      animation: pulse 1s infinite;
+      flex-shrink: 0;
+    }
+    @keyframes pulse {
+      0%,100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: 0.4; transform: scale(1.4); }
+    }
+    #last-label { color: #ffd700; font-weight: 600; }
+    #last-detail { color: #c9d1d9; }
     .charts {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 16px;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
     }
     .chart-box {
       background: #161b22;
@@ -136,24 +174,25 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       border-radius: 8px;
       padding: 16px;
     }
-    #last-update {
-      color: #8b949e;
-      font-size: 0.8rem;
-      text-align: right;
-    }
-    @media (max-width: 800px) {
-      .charts { grid-template-columns: 1fr; }
-    }
+    #footer { color: #8b949e; font-size: 0.75rem; text-align: right; }
+    @media (max-width: 800px) { .charts { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
   <h1>Weather Dashboard — Live</h1>
   <p class="subtitle">Datos en tiempo real desde Kafka · Refresca cada {{ refresh }}s</p>
+
+  <div id="last-banner">
+    <div class="dot"></div>
+    <span id="last-label">Esperando datos...</span>
+    <span id="last-detail"></span>
+  </div>
+
   <div class="charts">
     <div class="chart-box"><div id="chart-temp"></div></div>
     <div class="chart-box"><div id="chart-hum"></div></div>
   </div>
-  <p id="last-update">Cargando...</p>
+  <p id="footer">—</p>
 
   <script>
     const BASE_LAYOUT = {
@@ -165,56 +204,105 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       yaxis: { gridcolor: '#21262d' },
     };
 
-    function draw(data) {
+    function draw(resp) {
+      const data     = resp.cities;
+      const lastCity = resp.last_city;
       if (!data.length) return;
 
       const cities     = data.map(d => d.city);
       const temps      = data.map(d => d.temperature_c);
       const hums       = data.map(d => d.humidity);
       const conditions = data.map(d => `${d.condition} | ${d.wind_kph} kph`);
+      const lastIdx    = cities.indexOf(lastCity);
+      const lastData   = lastIdx >= 0 ? data[lastIdx] : null;
+
+      // Colores: dorado para el ultimo, escala normal para el resto
+      const tempColors = cities.map((c, i) =>
+        c === lastCity ? '#ffd700' : temps[i]);
+      const humColors  = cities.map(c =>
+        c === lastCity ? '#ffd700' : null);
+
+      // Bordes resaltados en el ultimo
+      const markerLine = {
+        color:  cities.map(c => c === lastCity ? '#ffffff' : 'rgba(0,0,0,0)'),
+        width:  cities.map(c => c === lastCity ? 2.5 : 0),
+      };
+
+      // Anotacion "← último" encima de la barra
+      const anno = lastIdx >= 0 ? [{
+        x: lastCity,
+        y: Math.max(...(lastIdx >= 0 ? [temps[lastIdx]] : temps)) + 1.5,
+        text: '▶ último',
+        showarrow: true,
+        arrowcolor: '#ffd700',
+        arrowsize: 1,
+        arrowwidth: 1.5,
+        ax: 0, ay: -28,
+        font: { color: '#ffd700', size: 11 },
+        bgcolor: 'rgba(0,0,0,0)',
+      }] : [];
 
       Plotly.react('chart-temp', [{
-        x: cities,
-        y: temps,
-        type: 'bar',
+        x: cities, y: temps, type: 'bar',
         marker: {
-          color: temps,
+          color: tempColors,
           colorscale: 'RdYlBu_r',
           showscale: true,
-          colorbar: { title: '°C', thickness: 14, len: 0.8 }
+          colorbar: { title: '°C', thickness: 14, len: 0.8 },
+          line: markerLine,
         },
-        text: temps.map(t => t + '°C'),
-        textposition: 'outside',
-        hovertext: conditions,
-        hoverinfo: 'x+y+text',
-        name: 'Temperatura'
+        text: temps.map(t => t + '°C'), textposition: 'outside',
+        hovertext: conditions, hoverinfo: 'x+y+text',
+        name: 'Temperatura',
       }], {
         ...BASE_LAYOUT,
         title: { text: '🌡 Temperatura (°C)', font: { color: '#58a6ff', size: 15 } },
-        yaxis: { ...BASE_LAYOUT.yaxis, title: '°C' }
+        yaxis: { ...BASE_LAYOUT.yaxis, title: '°C' },
+        annotations: anno,
       });
 
+      const annoHum = lastIdx >= 0 ? [{
+        x: lastCity,
+        y: hums[lastIdx] + 3,
+        text: '▶ último',
+        showarrow: true,
+        arrowcolor: '#ffd700',
+        arrowsize: 1,
+        arrowwidth: 1.5,
+        ax: 0, ay: -28,
+        font: { color: '#ffd700', size: 11 },
+        bgcolor: 'rgba(0,0,0,0)',
+      }] : [];
+
       Plotly.react('chart-hum', [{
-        x: cities,
-        y: hums,
-        type: 'bar',
+        x: cities, y: hums, type: 'bar',
         marker: {
-          color: hums,
+          color: humColors,
           colorscale: 'Blues',
           showscale: true,
-          colorbar: { title: '%', thickness: 14, len: 0.8 }
+          colorbar: { title: '%', thickness: 14, len: 0.8 },
+          line: markerLine,
         },
-        text: hums.map(h => h + '%'),
-        textposition: 'outside',
+        text: hums.map(h => h + '%'), textposition: 'outside',
         hoverinfo: 'x+y+text',
-        name: 'Humedad'
+        name: 'Humedad',
       }], {
         ...BASE_LAYOUT,
         title: { text: '💧 Humedad (%)', font: { color: '#58a6ff', size: 15 } },
-        yaxis: { ...BASE_LAYOUT.yaxis, title: '%', range: [0, 110] }
+        yaxis: { ...BASE_LAYOUT.yaxis, title: '%', range: [0, 115] },
+        annotations: annoHum,
       });
 
-      document.getElementById('last-update').textContent =
+      // Banner ultimo dato
+      if (lastData) {
+        document.getElementById('last-label').textContent =
+          `▶  ${lastData.city}, ${lastData.country}`;
+        document.getElementById('last-detail').textContent =
+          `${lastData.temperature_c}°C  ·  ${lastData.humidity}% hum  ·  `+
+          `${lastData.wind_kph} kph  ·  ${lastData.condition}  ·  ${lastData.timestamp}`;
+      }
+
+      document.getElementById('footer').textContent =
         'Última actualización: ' + new Date().toLocaleTimeString() +
         ' · ' + data.length + ' ciudades activas';
     }
@@ -240,7 +328,10 @@ def index():
 @app.route("/data")
 def data():
     with lock:
-        return jsonify(list(latest_by_city.values()))
+        return jsonify({
+            "cities":    list(latest_by_city.values()),
+            "last_city": last_received.get("city"),
+        })
 
 
 # ============================================================
@@ -248,15 +339,12 @@ def data():
 # ============================================================
 
 def main():
-    # Hilo 1: Kafka consumer
     t_kafka = threading.Thread(target=kafka_consumer_thread, daemon=True)
     t_kafka.start()
 
-    # Hilo 2: Terminal printer
     t_term = threading.Thread(target=terminal_printer_thread, daemon=True)
     t_term.start()
 
-    # Hilo principal: Flask
     print(f"[chart-consumer] Dashboard web en http://0.0.0.0:8050")
     app.run(host="0.0.0.0", port=8050, debug=False, use_reloader=False)
 
