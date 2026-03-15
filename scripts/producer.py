@@ -12,6 +12,7 @@ Uso:
 
 import json
 import os
+import random
 import time
 import requests
 from datetime import datetime
@@ -24,17 +25,34 @@ from kafka import KafkaProducer
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 WEATHER_API_KEY = os.getenv("WEATHER_API_KEY", "TU_API_KEY_AQUI")
-CITY = os.getenv("CITY", "Trujillo")
 KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP", "localhost:9092")
 KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "weather-data")
 INTERVAL_SECONDS = int(os.getenv("INTERVAL_SECONDS", "10"))
 
+CITIES = [
+    "Trujillo",
+    "Lima",
+    "Cusco",
+    "Arequipa",
+    "Madrid",
+    "Barcelona",
+    "Buenos Aires",
+    "Bogota",
+    "Santiago",
+    "Mexico City",
+    "New York",
+    "London",
+    "Tokyo",
+    "Sydney",
+    "Cape Town",
+]
+
 # ============================================
 # FUNCIONES
 # ============================================
-def get_weather():
-    """Obtiene datos del clima desde WeatherAPI"""
-    url = f"http://api.weatherapi.com/v1/current.json?key={WEATHER_API_KEY}&q={CITY}&aqi=no"
+def get_weather(city):
+    """Obtiene datos del clima desde WeatherAPI para una ciudad"""
+    url = f"http://api.weatherapi.com/v1/current.json?key={WEATHER_API_KEY}&q={city}&aqi=no"
     try:
         response = requests.get(url)
         response.raise_for_status()
@@ -52,30 +70,32 @@ def get_weather():
         }
         return weather
     except Exception as e:
-        print(f"Error obteniendo clima: {e}")
+        print(f"Error obteniendo clima de {city}: {e}")
         return None
 
 
 def main():
-    # Crear productor Kafka
     producer = KafkaProducer(
         bootstrap_servers=[KAFKA_BOOTSTRAP],
         value_serializer=lambda v: json.dumps(v).encode('utf-8')
     )
 
     print(f"Productor conectado a Kafka en {KAFKA_BOOTSTRAP}")
-    print(f"Enviando datos del clima de '{CITY}' al topic '{KAFKA_TOPIC}'")
+    print(f"Ciudades: {', '.join(CITIES)}")
     print(f"Intervalo: cada {INTERVAL_SECONDS} segundos")
     print("-" * 60)
 
     while True:
-        weather = get_weather()
+        city = random.choice(CITIES)
+        weather = get_weather(city)
         if weather:
             producer.send(KAFKA_TOPIC, value=weather)
             producer.flush()
-            print(f"Enviado a Kafka: {weather}")
+            print(f"[{weather['timestamp']}] {weather['city']}, {weather['country']} | "
+                  f"{weather['temperature_c']}°C | {weather['humidity']}% | "
+                  f"{weather['wind_kph']} kph | {weather['condition']}")
         else:
-            print("No se pudo obtener datos del clima, reintentando...")
+            print(f"Sin datos para {city}, continuando...")
 
         time.sleep(INTERVAL_SECONDS)
 
