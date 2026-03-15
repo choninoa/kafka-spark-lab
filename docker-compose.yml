@@ -9,7 +9,8 @@ services:
     user: root
     ports:
       - "9092:9092"
-      - "9093:9093"
+      # 9093 es el listener interno (PLAINTEXT://kafka:9093) — NO exponerlo al host
+      # porque Kafka lo anuncia con hostname "kafka" que no resuelve fuera de Docker
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -115,6 +116,7 @@ services:
     command: >
       /opt/spark/bin/spark-submit
       --master local[*]
+      --conf spark.driver.bindAddress=0.0.0.0
       --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0
       /opt/spark-scripts/spark_consumer.py
     volumes:
@@ -214,6 +216,8 @@ services:
     container_name: spark-worker
     depends_on:
       - spark-master
+    ports:
+      - "8081:8081"
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER=spark://spark-master:7077
