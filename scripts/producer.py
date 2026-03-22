@@ -32,19 +32,20 @@ INTERVAL_SECONDS = int(os.getenv("INTERVAL_SECONDS", "10"))
 CITIES = [
     "Trujillo",
     "Lima",
-    "Cusco",
-    "Arequipa",
+    "Machala",
+    "Santa Cruz de la Sierra",
     "Madrid",
     "Barcelona",
     "Buenos Aires",
     "Bogota",
     "Santiago",
-    "Mexico City",
+    "La Paz",
     "New York",
     "London",
     "Tokyo",
     "Sydney",
-    "Cape Town",
+    "La Havana",
+    
 ]
 
 # ============================================

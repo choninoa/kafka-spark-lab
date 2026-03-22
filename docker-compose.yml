@@ -102,7 +102,8 @@ services:
 
   # ============================================
   # SPARK CONSUMER - Streaming desde Kafka
-  # Comparte red y volumen con producer y spark
+  # Driver conectado al clúster spark-master:7077
+  # Workers ejecutan los tasks; driver corre aquí (client mode)
   # ============================================
   spark-consumer:
     image: apache/spark:3.5.3-python3
@@ -115,7 +116,7 @@ services:
       PYTHONUNBUFFERED: "1"
     command: >
       /opt/spark/bin/spark-submit
-      --master local[*]
+      --master spark://spark-master:7077
       --conf spark.driver.bindAddress=0.0.0.0
       --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0
       /opt/spark-scripts/spark_consumer.py
@@ -125,6 +126,8 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
+      spark-master:
+        condition: service_started
     deploy:
       resources:
         limits:
@@ -177,16 +180,15 @@ services:
 
   # ============================================
   # SPARK MASTER 3.5.3
-  # Consumer: docker exec spark-master /opt/spark/bin/spark-submit
-  #   --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0
-  #   /opt/spark-scripts/spark_consumer.py
+  # Web UI: http://localhost:8040
+  # Cluster: spark://spark-master:7077
   # ============================================
   spark-master:
     image: apache/spark:3.5.3-python3
     container_name: spark-master
     hostname: spark-master
     ports:
-      - "8080:8080"
+      - "8040:8080"
       - "7077:7077"
     environment:
       - SPARK_MODE=master
